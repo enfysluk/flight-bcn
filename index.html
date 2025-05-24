@@ -8,7 +8,7 @@
   <style>
     body { font-family: Arial, sans-serif; padding: 1rem; }
     h1 { font-size: 1.5rem; }
-    input, select { padding: 6px; margin: 5px 0; width: 100%; max-width: 400px; }
+    input, select { padding: 6px; margin: 5px 0; }
     #map { height: 50vh; margin: 1rem 0; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
@@ -17,44 +17,57 @@
 </head>
 <body>
 
-<h1>FlightRadar BCN - Global Cheapest Flights Finder</h1>
+<h1>🌍 FlightRadar BCN - Global Lowest Prices</h1>
 
-<label>Trip Type:</label>
+<!-- Trip type -->
+<label for="tripType">Trip Type:</label>
 <select id="tripType">
-  <option value="round">Round Trip</option>
   <option value="single">Single Trip</option>
+  <option value="round">Round Trip</option>
 </select>
 
 <br>
 
+<!-- From -->
 <label for="origin">From:</label>
-<input list="cities" id="origin" placeholder="e.g. Barcelona">
+<input list="cities" id="origin" placeholder="e.g. BCN">
 <br>
 
+<!-- To -->
 <label for="destination">To:</label>
-<input list="cities" id="destination" placeholder="e.g. Rome">
+<input list="cities" id="destination" placeholder="e.g. London">
 
 <datalist id="cities">
-  <option value="Barcelona">
-  <option value="London">
-  <option value="Berlin">
-  <option value="Rome">
-  <option value="Lisbon">
-  <option value="Paris">
-  <option value="Amsterdam">
+  <option value="BCN">
+  <option value="LON">
+  <option value="BER">
+  <option value="ROM">
+  <option value="LIS">
+  <option value="PAR">
+  <option value="AMS">
+  <option value="DUB">
+  <option value="VIE">
+  <option value="CPH">
 </datalist>
 
 <br>
 
-<label>Travel between:</label>
-<input type="date" id="startDate"> and
+<!-- Dates -->
+<label>Departure Date:</label>
+<input type="date" id="startDate">
+<label>Return Date:</label>
 <input type="date" id="endDate">
 
 <div id="map"></div>
 
 <table id="priceTable">
   <thead>
-    <tr><th>Route</th><th>Trip Type</th><th>Price (€)</th></tr>
+    <tr>
+      <th>Route</th>
+      <th>Trip Type</th>
+      <th>Price (€)</th>
+      <th>Offers</th>
+    </tr>
   </thead>
   <tbody></tbody>
 </table>
@@ -62,14 +75,13 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const allFlights = [
-  { from: "Barcelona", to: "London", price: 79, type: "round" },
-  { from: "Barcelona", to: "Berlin", price: 65, type: "single" },
-  { from: "Barcelona", to: "Rome", price: 58, type: "round" },
-  { from: "Barcelona", to: "Lisbon", price: 73, type: "single" },
-  { from: "Barcelona", to: "Paris", price: 89, type: "round" },
-  { from: "Barcelona", to: "Amsterdam", price: 82, type: "single" },
-  { from: "London", to: "Barcelona", price: 77, type: "round" },
-  { from: "Amsterdam", to: "Barcelona", price: 68, type: "single" }
+  { from: 'BCN', to: 'LON', price: 50, type: 'single' },
+  { from: 'BCN', to: 'BER', price: 65, type: 'round' },
+  { from: 'BCN', to: 'ROM', price: 58, type: 'round' },
+  { from: 'BCN', to: 'PAR', price: 89, type: 'single' },
+  { from: 'BCN', to: 'AMS', price: 82, type: 'round' },
+  { from: 'LON', to: 'BCN', price: 55, type: 'single' },
+  { from: 'BER', to: 'BCN', price: 67, type: 'round' }
 ];
 
 const map = L.map('map').setView([41.3851, 2.1734], 4);
@@ -77,16 +89,45 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18
 }).addTo(map);
 
-function fakePrice(base, start, end) {
+function fakePrice(base, date1, date2) {
   let bonus = 0;
-  if (start) bonus += new Date(start).getDate() % 7 * 2;
-  if (end) bonus += new Date(end).getDate() % 5 * 2;
+  if (date1) bonus += new Date(date1).getDate() % 7 * 2;
+  if (date2) bonus += new Date(date2).getDate() % 5 * 2;
   return base + bonus;
 }
 
+// 🚧 未来可接入真实 API
+function fetchRealOffers(from, to, date, type = 'single') {
+  return Promise.resolve([
+    { airline: 'Ryanair', price: 20, link: 'https://www.ryanair.com/' },
+    { airline: 'Vueling', price: 23, link: 'https://www.vueling.com/' },
+    { airline: 'Iberia', price: 35, link: 'https://www.iberia.com/' }
+  ]);
+}
+
+function showOptions(index, from, to, date, type) {
+  const container = document.getElementById(`options-${index}`);
+  if (container.style.display === 'block') {
+    container.style.display = 'none';
+    return;
+  }
+  container.innerHTML = 'Loading offers...';
+  container.style.display = 'block';
+
+  fetchRealOffers(from, to, date, type).then(offers => {
+    if (!offers || offers.length === 0) {
+      container.innerHTML = 'No offers found.';
+    } else {
+      container.innerHTML = offers.map(o =>
+        `${o.airline} - €${o.price} <a href="${o.link}" target="_blank">Visit</a>`
+      ).join('<br>');
+    }
+  });
+}
+
 function updateDisplay() {
-  const origin = document.getElementById('origin').value.toLowerCase();
-  const destination = document.getElementById('destination').value.toLowerCase();
+  const origin = document.getElementById('origin').value.toUpperCase();
+  const destination = document.getElementById('destination').value.toUpperCase();
   const startDate = document.getElementById('startDate').value;
   const endDate = document.getElementById('endDate').value;
   const tripType = document.getElementById('tripType').value;
@@ -97,17 +138,26 @@ function updateDisplay() {
     if (layer instanceof L.CircleMarker) map.removeLayer(layer);
   });
 
-  allFlights.forEach(f => {
-    if (origin && f.from.toLowerCase() !== origin) return;
-    if (destination && f.to.toLowerCase() !== destination) return;
+  allFlights.forEach((f, index) => {
+    if (origin && f.from !== origin) return;
+    if (destination && f.to !== destination) return;
     if (tripType && f.type !== tripType) return;
 
     const price = fakePrice(f.price, startDate, endDate);
     const route = `${f.from} → ${f.to}`;
 
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${route}</td><td>${f.type === 'round' ? 'Round Trip' : 'Single'}</td><td>${price}</td>`;
+    tr.innerHTML = `
+      <td>${route}</td>
+      <td>${f.type === 'round' ? 'Round Trip' : 'Single'}</td>
+      <td>€${price}</td>
+      <td><button onclick="showOptions(${index}, '${f.from}', '${f.to}', '${startDate}', '${f.type}')">查看报价</button></td>
+    `;
     tableBody.appendChild(tr);
+
+    const optionsRow = document.createElement('tr');
+    optionsRow.innerHTML = `<td colspan="4"><div id="options-${index}" style="display:none;"></div></td>`;
+    tableBody.appendChild(optionsRow);
 
     const lat = 41 + (Math.random() - 0.5) * 15;
     const lng = 2 + (Math.random() - 0.5) * 30;
@@ -122,9 +172,11 @@ function updateDisplay() {
   });
 }
 
-['origin', 'destination', 'startDate', 'endDate', 'tripType'].forEach(id => {
-  document.getElementById(id).addEventListener('input', updateDisplay);
-});
+document.getElementById('origin').addEventListener('input', updateDisplay);
+document.getElementById('destination').addEventListener('input', updateDisplay);
+document.getElementById('startDate').addEventListener('input', updateDisplay);
+document.getElementById('endDate').addEventListener('input', updateDisplay);
+document.getElementById('tripType').addEventListener('change', updateDisplay);
 
 updateDisplay();
 </script>
