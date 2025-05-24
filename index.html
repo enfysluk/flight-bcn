@@ -1,99 +1,168 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>FlightRadar BCN - Smart Finder</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>
-  body { font-family: Arial, sans-serif; margin: 0; padding: 1rem; }
-  h1 { font-size: 1.5rem; }
-  input, select { padding: 5px; margin: 5px 0; }
-  #map { height: 50vh; margin: 1rem 0; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-  th { background: #f4f4f4; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlightRadar BCN - Smart Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 1rem; }
+    h1 { font-size: 1.5rem; }
+    input, select { padding: 6px; margin: 5px 0; }
+    #map { height: 50vh; margin: 1rem 0; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background: #f4f4f4; }
+  </style>
 </head>
 <body>
 
-<h1>FlightRadar BCN - Global Lowest One-Way Prices</h1>
+<h1>FlightRadar BCN - Global Lowest Prices</h1>
 
-<label for="search">Search destination:</label>
-<input type="text" id="search" placeholder="e.g. London">
+<label for="tripType">Trip Type:</label>
+<select id="tripType">
+  <option value="oneway">One-way</option>
+  <option value="roundtrip">Round-trip</option>
+</select>
 
-<label for="date">Select departure date:</label>
-<input type="date" id="date">
+<br>
+
+<label for="departure">Departure:</label>
+<input list="cities" id="departure" placeholder="Choose departure city (e.g. Barcelona)">
+<label for="destination">Destination:</label>
+<input list="cities" id="destination" placeholder="Choose destination city (e.g. London)">
+
+<datalist id="cities">
+  <option value="Barcelona (BCN)">
+  <option value="London">
+  <option value="Berlin">
+  <option value="Rome">
+  <option value="Lisbon">
+  <option value="Paris">
+  <option value="Amsterdam">
+  <!-- 可继续添加更多 -->
+</datalist>
+
+<br>
+
+<label for="departDate">Departure date:</label>
+<input type="date" id="departDate">
+
+<label for="returnDate" style="display:none;">Return date:</label>
+<input type="date" id="returnDate" style="display:none;">
 
 <div id="map"></div>
 
 <table id="priceTable">
   <thead>
-    <tr><th>Destination</th><th>Price (€)</th></tr>
+    <tr><th>Route</th><th>Price (€)</th></tr>
   </thead>
   <tbody></tbody>
 </table>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-let allFlights = [];
-
-function loadData() {
-  fetch('data/flights.json')
-    .then(res => res.json())
-    .then(data => {
-      allFlights = data;
-      updateDisplay();
-    });
-}
-
-function fakeDatePriceModifier(base, dateStr) {
-  if (!dateStr) return base;
-  const day = new Date(dateStr).getDate();
-  return base + (day % 7) * 3;  // 模拟价格浮动
-}
-
-function updateDisplay() {
-  const searchValue = document.getElementById('search').value.toLowerCase();
-  const dateValue = document.getElementById('date').value;
-  const tableBody = document.querySelector('#priceTable tbody');
-  tableBody.innerHTML = '';
-
-  map.eachLayer(layer => {
-    if (layer instanceof L.CircleMarker) map.removeLayer(layer);
-  });
-
-  allFlights.forEach(flight => {
-    if (!flight.destination.toLowerCase().includes(searchValue)) return;
-
-    const price = fakeDatePriceModifier(flight.price, dateValue);
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${flight.destination}</td><td>${price}</td>`;
-    tableBody.appendChild(tr);
-
-    const lat = 41 + (Math.random() - 0.5) * 15;
-    const lng = 2 + (Math.random() - 0.5) * 30;
-    const marker = L.circleMarker([lat, lng], {
-      radius: 6,
-      fillColor: '#28a',
-      color: '#000',
-      weight: 1,
-      fillOpacity: 0.7
-    }).addTo(map);
-    marker.bindPopup(`${flight.destination}: €${price}`);
-  });
-}
-
-document.getElementById('search').addEventListener('input', updateDisplay);
-document.getElementById('date').addEventListener('input', updateDisplay);
+let allFlights = [
+  { city: "Barcelona (BCN)", price: 0 },
+  { city: "London", price: 79 },
+  { city: "Berlin", price: 65 },
+  { city: "Rome", price: 58 },
+  { city: "Lisbon", price: 73 },
+  { city: "Paris", price: 89 },
+  { city: "Amsterdam", price: 82 }
+];
 
 const map = L.map('map').setView([41.3851, 2.1734], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18
 }).addTo(map);
 
-loadData();
+function fakePrice(base, date1, date2) {
+  let bonus = 0;
+  if (date1) bonus += new Date(date1).getDate() % 7 * 2;
+  if (date2) bonus += new Date(date2).getDate() % 5 * 2;
+  return base + bonus;
+}
+
+function findPrice(cityName) {
+  const flight = allFlights.find(f => f.city.toLowerCase() === cityName.toLowerCase());
+  return flight ? flight.price : null;
+}
+
+function updateDisplay() {
+  const tripType = document.getElementById('tripType').value;
+  const departure = document.getElementById('departure').value.trim();
+  const destination = document.getElementById('destination').value.trim();
+  const departDate = document.getElementById('departDate').value;
+  const returnDate = document.getElementById('returnDate').value;
+  const tableBody = document.querySelector('#priceTable tbody');
+  tableBody.innerHTML = '';
+  
+  // 清除地图上旧的marker
+  map.eachLayer(layer => {
+    if (layer instanceof L.CircleMarker) map.removeLayer(layer);
+  });
+
+  if (!departure || !destination) return;
+  if (!departDate) return;
+  if (tripType === "roundtrip" && !returnDate) return;
+
+  // 计算价格，取出发和目的地价格中最大值作为基础价
+  const priceDep = findPrice(departure);
+  const priceDes = findPrice(destination);
+  if (priceDep === null || priceDes === null) {
+    tableBody.innerHTML = `<tr><td colspan="2">No price data for selected cities.</td></tr>`;
+    return;
+  }
+
+  const basePrice = Math.max(priceDep, priceDes);
+  const price = fakePrice(basePrice, departDate, tripType === "roundtrip" ? returnDate : null);
+
+  let routeStr = `${departure} → ${destination}`;
+  if(tripType === "roundtrip") {
+    routeStr += ` (Round-trip)`;
+  } else {
+    routeStr += ` (One-way)`;
+  }
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${routeStr}</td><td>€${price}</td>`;
+  tableBody.appendChild(tr);
+
+  // 随机坐标示意
+  const lat = 41 + (Math.random() - 0.5) * 15;
+  const lng = 2 + (Math.random() - 0.5) * 30;
+  const marker = L.circleMarker([lat, lng], {
+    radius: 6,
+    fillColor: '#28a',
+    color: '#000',
+    weight: 1,
+    fillOpacity: 0.7
+  }).addTo(map);
+  marker.bindPopup(`${routeStr}: €${price}`);
+}
+
+document.getElementById('tripType').addEventListener('change', () => {
+  const tripType = document.getElementById('tripType').value;
+  const returnLabel = document.querySelector('label[for="returnDate"]');
+  const returnInput = document.getElementById('returnDate');
+
+  if(tripType === "oneway") {
+    returnLabel.style.display = "none";
+    returnInput.style.display = "none";
+  } else {
+    returnLabel.style.display = "inline";
+    returnInput.style.display = "inline";
+  }
+  updateDisplay();
+});
+
+document.getElementById('departure').addEventListener('input', updateDisplay);
+document.getElementById('destination').addEventListener('input', updateDisplay);
+document.getElementById('departDate').addEventListener('input', updateDisplay);
+document.getElementById('returnDate').addEventListener('input', updateDisplay);
+
+updateDisplay();
 </script>
 
 </body>
