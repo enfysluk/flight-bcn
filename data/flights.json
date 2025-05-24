@@ -1,0 +1,6 @@
+[
+  { "destination": "London", "price": 79 },
+  { "destination": "Berlin", "price": 65 },
+  { "destination": "Rome", "price": 58 },
+  { "destination": "Lisbon", "price": 73 }
+]
